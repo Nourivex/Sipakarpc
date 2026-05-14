@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { Activity, Cpu, AlertCircle, Database, TrendingUp, Users, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Activity, Cpu, AlertCircle, Database, TrendingUp, Users, CheckCircle2, AlertTriangle, ShieldCheck, Clock } from 'lucide-react';
 import { getHistory, getSymptoms, getComponents, getKBRelations, DiagnosisHistory, Symptom, Component, KBRelation } from '../../data/adminStore';
 
 const confidenceColor = (cf: number) => {
@@ -41,14 +41,14 @@ export function AdminDashboard() {
 
   // Calculate Real Stats
   const totalDiagnosis = history.length;
-  const avgConfidence = totalDiagnosis > 0 
-    ? Math.round(history.reduce((acc, curr) => acc + curr.confidence, 0) / totalDiagnosis) 
+  const avgConfidence = totalDiagnosis > 0
+    ? Math.round(history.reduce((acc, curr) => acc + curr.confidence, 0) / totalDiagnosis)
     : 0;
 
   const componentStats = components.map(comp => ({
     name: comp.name,
     count: history.filter(h => h.mainDiagnosis === comp.name).length,
-    fill: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0') // Random color for now
+    fill: '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0') // Random color for now
   })).sort((a, b) => b.count - a.count);
 
   const pieData = componentStats.filter(c => c.count > 0);
@@ -154,7 +154,7 @@ export function AdminDashboard() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-5">
-         {/* Bar Chart */}
+        {/* Bar Chart */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
           <div className="mb-6">
             <h2 className="font-bold text-gray-900">Analisis per Komponen</h2>
@@ -199,9 +199,9 @@ export function AdminDashboard() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-gray-900 truncate">{h.mainDiagnosis}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                       <span className="text-[10px] text-gray-400 font-medium">{h.date}</span>
-                       <span className="w-1 h-1 bg-gray-300 rounded-full" />
-                       <span className="text-[10px] text-blue-600 font-bold">{h.symptoms.length} Gejala</span>
+                      <span className="text-[10px] text-gray-400 font-medium">{h.date}</span>
+                      <span className="w-1 h-1 bg-gray-300 rounded-full" />
+                      <span className="text-[10px] text-blue-600 font-bold">{h.symptoms.length} Gejala</span>
                     </div>
                   </div>
                   <div className={`px-2.5 py-1 rounded-lg border flex flex-col items-center min-w-[60px] ${confidenceColor(h.confidence)} border-current/20`}>

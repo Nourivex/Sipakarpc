@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Toaster } from 'sonner';
 import { HomePage } from './components/HomePage';
 import { DiagnosisPage } from './components/DiagnosisPage';
 import { ResultsPage } from './components/ResultsPage';
@@ -129,6 +130,7 @@ export default function App() {
 
   return (
     <>
+      <Toaster position="top-right" richColors closeButton />
       {currentPage === 'home' && (
         <HomePage onStart={handleStart} onGoAdmin={handleGoAdmin} />
       )}
