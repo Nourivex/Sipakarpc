@@ -1,30 +1,7 @@
 import { useState, useEffect } from 'react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Activity, Cpu, AlertCircle, Database, TrendingUp, Users, CheckCircle2 } from 'lucide-react';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { Activity, Cpu, AlertCircle, Database, TrendingUp, Users, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { getHistory, getSymptoms, getComponents, getKBRelations, DiagnosisHistory, Symptom, Component, KBRelation } from '../../data/adminStore';
-
-const diagnosisFrequency = [
-  { name: 'Harddisk', count: 18, fill: '#3b82f6' },
-  { name: 'VGA Card', count: 14, fill: '#8b5cf6' },
-  { name: 'RAM', count: 12, fill: '#10b981' },
-  { name: 'Overheat', count: 10, fill: '#f59e0b' },
-  { name: 'Power Supply', count: 9, fill: '#eab308' },
-  { name: 'Monitor', count: 7, fill: '#06b6d4' },
-  { name: 'Processor', count: 6, fill: '#f97316' },
-  { name: 'Motherboard', count: 4, fill: '#ef4444' },
-];
-
-const trendData = [
-  { day: '4 Mei', count: 5 },
-  { day: '5 Mei', count: 8 },
-  { day: '6 Mei', count: 12 },
-  { day: '7 Mei', count: 7 },
-  { day: '8 Mei', count: 15 },
-  { day: '9 Mei', count: 10 },
-  { day: '10 Mei', count: 23 },
-];
-
-const pieData = diagnosisFrequency.map(d => ({ name: d.name, value: d.count, fill: d.fill }));
 
 const confidenceColor = (cf: number) => {
   if (cf >= 75) return 'text-green-600 bg-green-50';
@@ -62,37 +39,66 @@ export function AdminDashboard() {
     loadData();
   }, []);
 
+  // Calculate Real Stats
+  const totalDiagnosis = history.length;
+  const avgConfidence = totalDiagnosis > 0 
+    ? Math.round(history.reduce((acc, curr) => acc + curr.confidence, 0) / totalDiagnosis) 
+    : 0;
+
+  const componentStats = components.map(comp => ({
+    name: comp.name,
+    count: history.filter(h => h.mainDiagnosis === comp.name).length,
+    fill: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0') // Random color for now
+  })).sort((a, b) => b.count - a.count);
+
+  const pieData = componentStats.filter(c => c.count > 0);
+
+  // Group trend by date
+  const trendMap = history.reduce((acc: any, curr) => {
+    const d = curr.date.split(',')[0]; // Simple date grouping
+    acc[d] = (acc[d] || 0) + 1;
+    return acc;
+  }, {});
+  const trendData = Object.entries(trendMap).map(([day, count]) => ({ day, count })).slice(-7);
+
   const statCards = [
-    { label: 'Total Diagnosis', value: String(history.length), change: 'Sesi tersimpan', icon: Activity, color: 'bg-blue-500', light: 'bg-blue-50 text-blue-600' },
-    { label: 'Total Gejala', value: String(symptoms.length), change: 'Gejala aktif', icon: AlertCircle, color: 'bg-purple-500', light: 'bg-purple-50 text-purple-600' },
-    { label: 'Total Komponen', value: String(components.length), change: '8 komponen aktif', icon: Cpu, color: 'bg-green-500', light: 'bg-green-50 text-green-600' },
-    { label: 'Relasi KB', value: String(kbRelations.length), change: 'Aturan CF aktif', icon: Database, color: 'bg-orange-500', light: 'bg-orange-50 text-orange-600' },
+    { label: 'Total Diagnosis', value: String(totalDiagnosis), change: 'Sesi tersimpan', icon: Activity, color: 'bg-blue-500', light: 'bg-blue-50 text-blue-600' },
+    { label: 'Rata-rata CF', value: `${avgConfidence}%`, change: 'Tingkat keyakinan', icon: ShieldCheck, color: 'bg-green-500', light: 'bg-green-50 text-green-600' },
+    { label: 'Total Gejala', value: String(symptoms.length), change: 'Basis data', icon: AlertCircle, color: 'bg-purple-500', light: 'bg-purple-50 text-purple-600' },
+    { label: 'Rules Pakar', value: String(kbRelations.length), change: 'Relasi MB/MD', icon: Database, color: 'bg-orange-500', light: 'bg-orange-50 text-orange-600' },
   ];
 
-  const recentHistory = history.slice(0, 5);
-
-  if (loading) return <div className="p-8 text-center text-gray-500">Memuat data dashboard...</div>;
+  if (loading) return <div className="p-12 text-center flex flex-col items-center gap-3">
+    <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    <p className="text-gray-500 font-medium">Menganalisis data sistem pakar...</p>
+  </div>;
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-1">Gambaran umum sistem pakar diagnosis PC</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard Ringkasan</h1>
+          <p className="text-gray-500 text-sm mt-1">Status sistem diagnosis hardware PC saat ini</p>
+        </div>
+        <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-2">
+          <Clock className="w-4 h-4 text-blue-600" />
+          <span className="text-xs font-semibold text-blue-700">Pembaruan Terakhir: {new Date().toLocaleTimeString()}</span>
+        </div>
       </div>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
         {statCards.map((s, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm text-gray-500 mb-1">{s.label}</p>
                 <p className="text-3xl font-bold text-gray-900">{s.value}</p>
                 <p className="text-xs text-gray-400 mt-1">{s.change}</p>
               </div>
-              <div className={`w-11 h-11 ${s.light} rounded-xl flex items-center justify-center`}>
-                <s.icon className="w-5 h-5" />
+              <div className={`w-12 h-12 ${s.light} rounded-xl flex items-center justify-center shadow-inner`}>
+                <s.icon className="w-6 h-6" />
               </div>
             </div>
           </div>
@@ -103,101 +109,109 @@ export function AdminDashboard() {
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Trend Chart */}
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="font-semibold text-gray-900">Tren Diagnosis</h2>
-              <p className="text-xs text-gray-400">7 hari terakhir</p>
+              <h2 className="font-bold text-gray-900">Tren Penggunaan Sistem</h2>
+              <p className="text-xs text-gray-400">Log harian aktivitas diagnosis</p>
             </div>
-            <div className="flex items-center gap-1.5 text-green-600 bg-green-50 px-2.5 py-1 rounded-full text-xs font-medium">
-              <TrendingUp className="w-3.5 h-3.5" />
-              +53% minggu ini
-            </div>
+            <TrendingUp className="w-5 h-5 text-green-500" />
           </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={trendData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={trendData.length > 0 ? trendData : [{ day: 'No Data', count: 0 }]}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+              <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} dy={10} />
+              <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
               <Tooltip
-                contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: '12px' }}
-                cursor={{ stroke: '#e5e7eb', strokeWidth: 1 }}
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', fontSize: '12px' }}
               />
-              <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2.5} dot={{ fill: '#3b82f6', r: 4, strokeWidth: 0 }} activeDot={{ r: 6 }} name="Diagnosis" />
+              <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={3} dot={{ fill: '#2563eb', r: 4, strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, strokeWidth: 0 }} name="Diagnosis" />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
         {/* Pie Chart */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <div className="mb-5">
-            <h2 className="font-semibold text-gray-900">Distribusi Kerusakan</h2>
-            <p className="text-xs text-gray-400">Berdasarkan frekuensi diagnosis</p>
+          <div className="mb-6">
+            <h2 className="font-bold text-gray-900">Distribusi Kerusakan</h2>
+            <p className="text-xs text-gray-400">Komponen yang paling sering bermasalah</p>
           </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={2}>
-                {pieData.map((entry, index) => (
-                  <Cell key={index} fill={entry.fill} />
+          {pieData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} dataKey="value" paddingAngle={5} nameKey="name">
+                  {pieData.map((entry, index) => (
+                    <Cell key={index} fill={entry.fill} stroke="rgba(255,255,255,0.2)" />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', fontSize: '11px' }} />
+                <Legend layout="horizontal" verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[250px] flex items-center justify-center text-gray-400 text-sm italic">Belum ada data untuk ditampilkan</div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-5">
+         {/* Bar Chart */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="mb-6">
+            <h2 className="font-bold text-gray-900">Analisis per Komponen</h2>
+            <p className="text-xs text-gray-400">Total temuan positif per hardware</p>
+          </div>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={componentStats} layout="vertical" margin={{ left: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+              <XAxis type="number" hide />
+              <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: '#374151', fontWeight: 500 }} axisLine={false} tickLine={false} width={100} />
+              <Tooltip cursor={{ fill: '#f9fafb' }} />
+              <Bar dataKey="count" radius={[0, 4, 4, 0]} name="Total Kasus">
+                {componentStats.map((entry, index) => (
+                  <Cell key={index} fill={entry.count > 0 ? '#3b82f6' : '#e5e7eb'} />
                 ))}
-              </Pie>
-              <Tooltip contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: '11px' }} />
-            </PieChart>
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
 
-      {/* Bar Chart Full Width */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="mb-5">
-          <h2 className="font-semibold text-gray-900">Frekuensi Diagnosis per Komponen</h2>
-          <p className="text-xs text-gray-400">Total kasus terdeteksi</p>
-        </div>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={diagnosisFrequency} barSize={32}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-            <Tooltip
-              contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: '12px' }}
-              cursor={{ fill: '#f9fafb' }}
-            />
-            <Bar dataKey="count" radius={[6, 6, 0, 0]} name="Kasus">
-              {diagnosisFrequency.map((entry, index) => (
-                <Cell key={index} fill={entry.fill} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Recent Diagnoses */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold text-gray-900">Riwayat Diagnosis Terbaru</h2>
-            <p className="text-xs text-gray-400">{history.length} diagnosis tersimpan</p>
+        {/* Recent Diagnoses */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+            <div>
+              <h2 className="font-bold text-gray-900 text-sm">Riwayat Diagnosis Terbaru</h2>
+              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Top 5 Sesi Terakhir</p>
+            </div>
+            <Users className="w-5 h-5 text-gray-400" />
           </div>
-          <Users className="w-5 h-5 text-gray-400" />
-        </div>
-        <div className="divide-y divide-gray-50">
-          {recentHistory.length === 0 ? (
-            <div className="px-6 py-10 text-center text-gray-400 text-sm">Belum ada riwayat diagnosis.</div>
-          ) : (
-            recentHistory.map((h) => (
-              <div key={h.id} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
-                <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <CheckCircle2 className="w-4 h-4 text-blue-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{h.mainDiagnosis}</p>
-                  <p className="text-xs text-gray-400">{h.symptoms.length} gejala &bull; {h.date}</p>
-                </div>
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${confidenceColor(h.confidence)}`}>
-                  {h.confidence}%
-                </span>
+          <div className="flex-1 divide-y divide-gray-50">
+            {history.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
+                <AlertTriangle className="w-8 h-8 opacity-20" />
+                <p className="text-sm italic">Belum ada riwayat masuk.</p>
               </div>
-            ))
-          )}
+            ) : (
+              history.slice(0, 5).map((h) => (
+                <div key={h.id} className="px-6 py-3.5 flex items-center gap-4 hover:bg-blue-50/30 transition-colors group">
+                  <div className="w-10 h-10 bg-white border border-gray-100 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm group-hover:border-blue-200">
+                    <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-900 truncate">{h.mainDiagnosis}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                       <span className="text-[10px] text-gray-400 font-medium">{h.date}</span>
+                       <span className="w-1 h-1 bg-gray-300 rounded-full" />
+                       <span className="text-[10px] text-blue-600 font-bold">{h.symptoms.length} Gejala</span>
+                    </div>
+                  </div>
+                  <div className={`px-2.5 py-1 rounded-lg border flex flex-col items-center min-w-[60px] ${confidenceColor(h.confidence)} border-current/20`}>
+                    <span className="text-[10px] font-bold uppercase opacity-70 leading-none mb-0.5">CF</span>
+                    <span className="text-sm font-black leading-none">{h.confidence}%</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>

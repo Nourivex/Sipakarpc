@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Search, ChevronDown, ChevronUp, Clock, CheckCircle2, Filter } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Clock, CheckCircle2, Filter, FileSpreadsheet } from 'lucide-react';
 import { getHistory, getSymptoms, DiagnosisHistory, Symptom } from '../../data/adminStore';
+import { exportHistoryToExcel } from '../../utils/exportUtils';
 
 const componentColors: Record<string, string> = {
   'VGA Card': 'bg-purple-100 text-purple-700',
@@ -72,13 +73,26 @@ export function AdminHistory() {
     })(),
   } : { total: 0, highConf: 0, avgConf: 0, mostCommon: '-' };
 
+  const handleExport = () => {
+    exportHistoryToExcel(filtered, symptoms);
+  };
+
   if (loading) return <div className="p-8 text-center text-gray-500">Memuat riwayat...</div>;
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Riwayat Diagnosis</h1>
-        <p className="text-gray-500 text-sm mt-1">Log semua sesi diagnosis yang pernah dilakukan</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Riwayat Diagnosis</h1>
+          <p className="text-gray-500 text-sm mt-1">Log semua sesi diagnosis yang pernah dilakukan</p>
+        </div>
+        <button
+          onClick={handleExport}
+          className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm"
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          Ekspor ke Excel
+        </button>
       </div>
 
       {/* Summary Cards */}

@@ -18,10 +18,10 @@ interface AdminLayoutProps {
 
 const navItems: { id: AdminPage; label: string; icon: React.ElementType; badge?: string }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'symptoms', label: 'Manajemen Gejala', icon: AlertCircle, badge: '28' },
-  { id: 'components', label: 'Manajemen Komponen', icon: Cpu, badge: '8' },
-  { id: 'knowledgebase', label: 'Knowledge Base (CF)', icon: Database, badge: '37' },
-  { id: 'history', label: 'Riwayat Diagnosis', icon: History, badge: '10' },
+  { id: 'symptoms', label: 'Manajemen Gejala', icon: AlertCircle },
+  { id: 'components', label: 'Manajemen Komponen', icon: Cpu },
+  { id: 'knowledgebase', label: 'Knowledge Base (CF)', icon: Database },
+  { id: 'history', label: 'Riwayat Diagnosis', icon: History },
 ];
 
 export function AdminLayout({ onLogout, onGoToMain }: AdminLayoutProps) {
