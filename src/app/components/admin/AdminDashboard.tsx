@@ -1,6 +1,7 @@
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { useState, useEffect } from 'react';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Activity, Cpu, AlertCircle, Database, TrendingUp, Users, CheckCircle2 } from 'lucide-react';
-import { mockHistory, defaultSymptoms, defaultComponents, defaultKBRelations } from '../../data/adminStore';
+import { getHistory, getSymptoms, getComponents, getKBRelations, DiagnosisHistory, Symptom, Component, KBRelation } from '../../data/adminStore';
 
 const diagnosisFrequency = [
   { name: 'Harddisk', count: 18, fill: '#3b82f6' },
@@ -25,15 +26,6 @@ const trendData = [
 
 const pieData = diagnosisFrequency.map(d => ({ name: d.name, value: d.count, fill: d.fill }));
 
-const statCards = [
-  { label: 'Total Diagnosis', value: '80', change: '+23 hari ini', icon: Activity, color: 'bg-blue-500', light: 'bg-blue-50 text-blue-600' },
-  { label: 'Total Gejala', value: String(defaultSymptoms.length), change: '28 gejala aktif', icon: AlertCircle, color: 'bg-purple-500', light: 'bg-purple-50 text-purple-600' },
-  { label: 'Total Komponen', value: String(defaultComponents.length), change: '8 komponen aktif', icon: Cpu, color: 'bg-green-500', light: 'bg-green-50 text-green-600' },
-  { label: 'Relasi KB', value: String(defaultKBRelations.length), change: 'Aturan CF aktif', icon: Database, color: 'bg-orange-500', light: 'bg-orange-50 text-orange-600' },
-];
-
-const recentHistory = mockHistory.slice(0, 5);
-
 const confidenceColor = (cf: number) => {
   if (cf >= 75) return 'text-green-600 bg-green-50';
   if (cf >= 50) return 'text-blue-600 bg-blue-50';
@@ -42,6 +34,45 @@ const confidenceColor = (cf: number) => {
 };
 
 export function AdminDashboard() {
+  const [history, setHistory] = useState<DiagnosisHistory[]>([]);
+  const [symptoms, setSymptoms] = useState<Symptom[]>([]);
+  const [components, setComponents] = useState<Component[]>([]);
+  const [kbRelations, setKbRelations] = useState<KBRelation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [h, s, c, k] = await Promise.all([
+          getHistory(),
+          getSymptoms(),
+          getComponents(),
+          getKBRelations()
+        ]);
+        setHistory(h);
+        setSymptoms(s);
+        setComponents(c);
+        setKbRelations(k);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  const statCards = [
+    { label: 'Total Diagnosis', value: String(history.length), change: 'Sesi tersimpan', icon: Activity, color: 'bg-blue-500', light: 'bg-blue-50 text-blue-600' },
+    { label: 'Total Gejala', value: String(symptoms.length), change: 'Gejala aktif', icon: AlertCircle, color: 'bg-purple-500', light: 'bg-purple-50 text-purple-600' },
+    { label: 'Total Komponen', value: String(components.length), change: '8 komponen aktif', icon: Cpu, color: 'bg-green-500', light: 'bg-green-50 text-green-600' },
+    { label: 'Relasi KB', value: String(kbRelations.length), change: 'Aturan CF aktif', icon: Database, color: 'bg-orange-500', light: 'bg-orange-50 text-orange-600' },
+  ];
+
+  const recentHistory = history.slice(0, 5);
+
+  if (loading) return <div className="p-8 text-center text-gray-500">Memuat data dashboard...</div>;
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -144,25 +175,29 @@ export function AdminDashboard() {
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h2 className="font-semibold text-gray-900">Riwayat Diagnosis Terbaru</h2>
-            <p className="text-xs text-gray-400">5 diagnosis terakhir</p>
+            <p className="text-xs text-gray-400">{history.length} diagnosis tersimpan</p>
           </div>
           <Users className="w-5 h-5 text-gray-400" />
         </div>
         <div className="divide-y divide-gray-50">
-          {recentHistory.map((h) => (
-            <div key={h.id} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
-              <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <CheckCircle2 className="w-4 h-4 text-blue-600" />
+          {recentHistory.length === 0 ? (
+            <div className="px-6 py-10 text-center text-gray-400 text-sm">Belum ada riwayat diagnosis.</div>
+          ) : (
+            recentHistory.map((h) => (
+              <div key={h.id} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
+                <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900">{h.mainDiagnosis}</p>
+                  <p className="text-xs text-gray-400">{h.symptoms.length} gejala &bull; {h.date}</p>
+                </div>
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${confidenceColor(h.confidence)}`}>
+                  {h.confidence}%
+                </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900">{h.mainDiagnosis}</p>
-                <p className="text-xs text-gray-400">{h.symptoms.length} gejala &bull; {h.date}</p>
-              </div>
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${confidenceColor(h.confidence)}`}>
-                {h.confidence}%
-              </span>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>

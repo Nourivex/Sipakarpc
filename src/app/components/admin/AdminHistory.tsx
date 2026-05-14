@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, ChevronDown, ChevronUp, Clock, CheckCircle2, Filter } from 'lucide-react';
-import { getHistory, getSymptoms, DiagnosisHistory } from '../../data/adminStore';
+import { getHistory, getSymptoms, DiagnosisHistory, Symptom } from '../../data/adminStore';
 
 const componentColors: Record<string, string> = {
   'VGA Card': 'bg-purple-100 text-purple-700',
-  'Power Supply': 'bg-yellow-100 text-yellow-700',
+  'Power Supplay': 'bg-yellow-100 text-yellow-700',
   'RAM': 'bg-green-100 text-green-700',
   'Harddisk': 'bg-blue-100 text-blue-700',
   'Motherboard': 'bg-red-100 text-red-700',
@@ -28,12 +28,25 @@ function confidenceLabel(cf: number) {
 }
 
 export function AdminHistory() {
-  const history = getHistory();
-  const symptoms = getSymptoms();
-
+  const [history, setHistory] = useState<DiagnosisHistory[]>([]);
+  const [symptoms, setSymptoms] = useState<Symptom[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterComp, setFilterComp] = useState('Semua');
   const [expanded, setExpanded] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [h, s] = await Promise.all([getHistory(), getSymptoms()]);
+        setHistory(h);
+        setSymptoms(s);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
 
   const getSymptomDesc = (code: string) => symptoms.find(s => s.code === code)?.description || code;
 
@@ -42,11 +55,11 @@ export function AdminHistory() {
   const filtered = history.filter(h => {
     const matchComp = filterComp === 'Semua' || h.mainDiagnosis === filterComp;
     const matchSearch = h.mainDiagnosis.toLowerCase().includes(search.toLowerCase())
-      || h.symptoms.some(s => s.toLowerCase().includes(search.toLowerCase()));
+      || h.symptoms.some(s => s.code.toLowerCase().includes(search.toLowerCase()));
     return matchComp && matchSearch;
   });
 
-  const stats = {
+  const stats = history.length > 0 ? {
     total: history.length,
     highConf: history.filter(h => h.confidence >= 75).length,
     avgConf: Math.round(history.reduce((a, b) => a + b.confidence, 0) / history.length),
@@ -57,7 +70,9 @@ export function AdminHistory() {
       }, {});
       return Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
     })(),
-  };
+  } : { total: 0, highConf: 0, avgConf: 0, mostCommon: '-' };
+
+  if (loading) return <div className="p-8 text-center text-gray-500">Memuat riwayat...</div>;
 
   return (
     <div className="space-y-5">
@@ -162,11 +177,12 @@ export function AdminHistory() {
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Gejala yang Dipilih</p>
                       <div className="flex flex-wrap gap-2">
-                        {h.symptoms.map(code => (
-                          <div key={code} className="flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-2.5 py-1.5 text-xs">
-                            <span className="font-bold">{code}</span>
+                        {h.symptoms.map(s => (
+                          <div key={s.code} className="flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-2.5 py-1.5 text-xs">
+                            <span className="font-bold">{s.code}</span>
                             <span className="text-blue-500">—</span>
-                            <span className="text-blue-600 max-w-48 truncate">{getSymptomDesc(code)}</span>
+                            <span className="text-blue-600 max-w-48 truncate">{getSymptomDesc(s.code)}</span>
+                            <span className="bg-blue-200 px-1.5 rounded-md ml-1">{(s.certainty * 100).toFixed(0)}%</span>
                           </div>
                         ))}
                       </div>

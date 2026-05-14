@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, Search, Check, AlertTriangle, Database, Info } from 'lucide-react';
-import { KBRelation, getKBRelations, saveKBRelations, getSymptoms, getComponents } from '../../data/adminStore';
+import { KBRelation, getKBRelations, saveKBRelation, deleteKBRelation, getSymptoms, getComponents, Symptom, Component } from '../../data/adminStore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
 
 const cfPresets = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
@@ -21,18 +21,35 @@ function cfBarColor(cf: number) {
 }
 
 export function AdminKnowledgeBase() {
-  const [relations, setRelations] = useState<KBRelation[]>(getKBRelations());
-  const symptoms = getSymptoms();
-  const components = getComponents();
+  const [relations, setRelations] = useState<KBRelation[]>([]);
+  const [symptoms, setSymptoms] = useState<Symptom[]>([]);
+  const [components, setComponents] = useState<Component[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState('');
   const [filterComp, setFilterComp] = useState('Semua');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<KBRelation | null>(null);
   const [editing, setEditing] = useState<KBRelation | null>(null);
-  const [form, setForm] = useState({ symptomCode: '', componentName: '', cfValue: 0.5 });
+  const [form, setForm] = useState({ symptomCode: '', componentName: '', mbValue: 0.5, mdValue: 0.0 });
   const [formError, setFormError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [r, s, c] = await Promise.all([getKBRelations(), getSymptoms(), getComponents()]);
+      setRelations(r);
+      setSymptoms(s);
+      setComponents(c);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const filtered = relations.filter(r => {
     const s = symptoms.find(x => x.code === r.symptomCode);
@@ -55,58 +72,52 @@ export function AdminKnowledgeBase() {
 
   const openAdd = () => {
     setEditing(null);
-    setForm({ symptomCode: symptoms[0]?.code || '', componentName: components[0]?.name || '', cfValue: 0.5 });
+    setForm({ symptomCode: symptoms[0]?.code || '', componentName: components[0]?.name || '', mbValue: 0.5, mdValue: 0.0 });
     setFormError('');
     setDialogOpen(true);
   };
 
   const openEdit = (r: KBRelation) => {
     setEditing(r);
-    setForm({ symptomCode: r.symptomCode, componentName: r.componentName, cfValue: r.cfValue });
+    setForm({ symptomCode: r.symptomCode, componentName: r.componentName, mbValue: r.mbValue, mdValue: r.md_value });
     setFormError('');
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.symptomCode || !form.componentName) {
       setFormError('Gejala dan komponen wajib dipilih.');
       return;
     }
-    const duplicate = relations.some(r =>
-      r.symptomCode === form.symptomCode &&
-      r.componentName === form.componentName &&
-      r !== editing
-    );
-    if (duplicate) {
-      setFormError('Relasi ini sudah ada di knowledge base.');
-      return;
+    try {
+      await saveKBRelation({
+        symptomCode: form.symptomCode,
+        componentName: form.componentName,
+        mbValue: form.mbValue,
+        md_value: form.mdValue
+      });
+      showSuccess(editing ? 'Relasi berhasil diperbarui!' : 'Relasi berhasil ditambahkan!');
+      setDialogOpen(false);
+      loadData();
+    } catch (err: any) {
+      setFormError(err.message || 'Gagal menyimpan relasi.');
     }
-    let updated: KBRelation[];
-    if (editing) {
-      updated = relations.map(r =>
-        r.symptomCode === editing.symptomCode && r.componentName === editing.componentName
-          ? { ...form }
-          : r
-      );
-      showSuccess('Relasi berhasil diperbarui!');
-    } else {
-      updated = [...relations, { ...form }];
-      showSuccess('Relasi berhasil ditambahkan!');
-    }
-    setRelations(updated);
-    saveKBRelations(updated);
-    setDialogOpen(false);
   };
 
-  const handleDelete = (r: KBRelation) => {
-    const updated = relations.filter(x => !(x.symptomCode === r.symptomCode && x.componentName === r.componentName));
-    setRelations(updated);
-    saveKBRelations(updated);
-    setDeleteDialog(null);
-    showSuccess('Relasi berhasil dihapus!');
+  const handleDelete = async (r: KBRelation) => {
+    try {
+      await deleteKBRelation(r.symptomCode, r.componentName);
+      setDeleteDialog(null);
+      showSuccess('Relasi berhasil dihapus!');
+      loadData();
+    } catch (err: any) {
+      alert('Gagal menghapus: ' + err.message);
+    }
   };
 
   const getSymptomDesc = (code: string) => symptoms.find(s => s.code === code)?.description || code;
+
+  if (loading && relations.length === 0) return <div className="p-8 text-center text-gray-500">Memuat basis pengetahuan...</div>;
 
   return (
     <div className="space-y-5">
@@ -134,7 +145,8 @@ export function AdminKnowledgeBase() {
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
         <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-blue-700">
-          Knowledge base menyimpan nilai CF (Certainty Factor) untuk setiap relasi gejala-komponen. Nilai CF berkisar antara <strong>0.1</strong> (lemah) hingga <strong>1.0</strong> (pasti).
+          Knowledge base menyimpan nilai <strong>MB</strong> (Measure of Belief) dan <strong>MD</strong> (Measure of Disbelief).<br/>
+          Sistem menghitung <strong>CF = MB - MD</strong>. Nilai CF berkisar antara 0 hingga 1.
         </p>
       </div>
 
@@ -164,7 +176,7 @@ export function AdminKnowledgeBase() {
         <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
           {components.map(c => {
             const rels = grouped[c.name] || [];
-            const avgCF = rels.length ? (rels.reduce((a, b) => a + b.cfValue, 0) / rels.length) : 0;
+            const avgCF = rels.length ? (rels.reduce((a, b) => a + (b.cfValue || 0), 0) / rels.length) : 0;
             return (
               <button
                 key={c.id}
@@ -193,17 +205,18 @@ export function AdminKnowledgeBase() {
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Kode Gejala</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Deskripsi Gejala</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Gejala</th>
                 <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Komponen</th>
-                <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Nilai CF</th>
+                <th className="px-5 py-3.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">MB</th>
+                <th className="px-5 py-3.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">MD</th>
+                <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Hasil CF</th>
                 <th className="px-5 py-3.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={6} className="px-5 py-12 text-center text-gray-400 text-sm">
                     <Database className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     Tidak ada relasi ditemukan
                   </td>
@@ -212,23 +225,23 @@ export function AdminKnowledgeBase() {
                 filtered.map((r, i) => (
                   <tr key={i} className="hover:bg-gray-50/60 transition-colors">
                     <td className="px-5 py-3.5">
-                      <span className="inline-flex items-center justify-center bg-blue-600 text-white text-xs font-bold px-2.5 py-1 rounded-lg min-w-[3rem]">
-                        {r.symptomCode}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-sm text-gray-700 max-w-xs">
-                      <p className="truncate">{getSymptomDesc(r.symptomCode)}</p>
+                      <div className="flex flex-col">
+                        <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded w-fit mb-1">{r.symptomCode}</span>
+                        <p className="text-xs text-gray-600 max-w-[200px] truncate">{getSymptomDesc(r.symptomCode)}</p>
+                      </div>
                     </td>
                     <td className="px-5 py-3.5">
                       <span className="text-sm font-medium text-gray-900">{r.componentName}</span>
                     </td>
+                    <td className="px-5 py-3.5 text-center font-mono text-xs text-blue-600 font-bold">{r.mbValue.toFixed(2)}</td>
+                    <td className="px-5 py-3.5 text-center font-mono text-xs text-red-500 font-bold">{r.md_value.toFixed(2)}</td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="w-20 bg-gray-100 rounded-full h-2">
-                          <div className={`${cfBarColor(r.cfValue)} rounded-full h-2 transition-all`} style={{ width: `${r.cfValue * 100}%` }} />
+                        <div className="w-16 bg-gray-100 rounded-full h-1.5">
+                          <div className={`${cfBarColor(r.cfValue || 0)} rounded-full h-1.5 transition-all`} style={{ width: `${(r.cfValue || 0) * 100}%` }} />
                         </div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cfBadge(r.cfValue)}`}>
-                          {r.cfValue.toFixed(1)}
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${cfBadge(r.cfValue || 0)}`}>
+                          {(r.cfValue || 0).toFixed(2)}
                         </span>
                       </div>
                     </td>
@@ -248,18 +261,15 @@ export function AdminKnowledgeBase() {
             </tbody>
           </table>
         </div>
-        <div className="px-5 py-3 border-t border-gray-100 text-xs text-gray-400">
-          Menampilkan {filtered.length} dari {relations.length} relasi
-        </div>
       </div>
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Edit Relasi CF' : 'Tambah Relasi CF Baru'}</DialogTitle>
+            <DialogTitle>{editing ? 'Edit Relasi MB/MD' : 'Tambah Relasi Baru'}</DialogTitle>
             <DialogDescription>
-              Tentukan hubungan antara gejala dan komponen beserta nilai Certainty Factor-nya.
+              Tentukan hubungan antara gejala dan komponen beserta nilai MB dan MD.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -294,34 +304,27 @@ export function AdminKnowledgeBase() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Nilai CF: <span className="text-blue-600 font-bold">{form.cfValue.toFixed(1)}</span>
-                <span className="text-gray-400 text-xs ml-2">({Math.round(form.cfValue * 100)}%)</span>
-              </label>
-              <input
-                type="range"
-                min={0.1}
-                max={1.0}
-                step={0.1}
-                value={form.cfValue}
-                onChange={e => setForm(f => ({ ...f, cfValue: parseFloat(e.target.value) }))}
-                className="w-full accent-blue-600"
-              />
-              <div className="flex justify-between mt-2 flex-wrap gap-1">
-                {cfPresets.map(v => (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, cfValue: v }))}
-                    className={`text-xs px-2 py-1 rounded-md border transition-all ${
-                      form.cfValue === v ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-300'
-                    }`}
-                  >
-                    {v.toFixed(1)}
-                  </button>
-                ))}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-blue-700 mb-1.5">MB: {form.mbValue.toFixed(2)}</label>
+                <input
+                  type="range" min={0} max={1} step={0.05} value={form.mbValue}
+                  onChange={e => setForm(f => ({ ...f, mbValue: parseFloat(e.target.value) }))}
+                  className="w-full accent-blue-600"
+                />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-red-700 mb-1.5">MD: {form.mdValue.toFixed(2)}</label>
+                <input
+                  type="range" min={0} max={1} step={0.05} value={form.mdValue}
+                  onChange={e => setForm(f => ({ ...f, mdValue: parseFloat(e.target.value) }))}
+                  className="w-full accent-red-600"
+                />
+              </div>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-center">
+              <p className="text-xs text-gray-500 uppercase font-bold mb-1">Hasil CF Akhir</p>
+              <p className="text-2xl font-bold text-gray-900">{(form.mbValue - form.mdValue).toFixed(2)}</p>
             </div>
           </div>
           <DialogFooter>
@@ -339,7 +342,7 @@ export function AdminKnowledgeBase() {
           <DialogHeader>
             <DialogTitle>Hapus Relasi</DialogTitle>
             <DialogDescription>
-              Hapus relasi <strong>{deleteDialog?.symptomCode}</strong> → <strong>{deleteDialog?.componentName}</strong>? Ini akan mempengaruhi akurasi diagnosis.
+              Hapus relasi <strong>{deleteDialog?.symptomCode}</strong> → <strong>{deleteDialog?.componentName}</strong>?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

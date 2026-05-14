@@ -1,50 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, Search, Cpu, AlertCircle, CheckCircle2, X, ClipboardList } from 'lucide-react';
-
-interface Symptom {
-  id: string;
-  code: string;
-  description: string;
-  category: string;
-}
+import { Symptom, getSymptoms, USER_CERTAINTY_LEVELS } from '../data/adminStore';
 
 interface DiagnosisPageProps {
   onBack: () => void;
-  onDiagnose: (selectedSymptoms: string[]) => void;
+  onDiagnose: (selected: { code: string; certainty: number }[]) => void;
 }
-
-const symptoms: Symptom[] = [
-  { id: 'E01', code: 'E01', description: 'Tidak ada tampilan di layar komputer', category: 'Tampilan' },
-  { id: 'E02', code: 'E02', description: 'Lampu indikator panel depan menyala', category: 'Daya' },
-  { id: 'E03', code: 'E03', description: 'Bunyi beep panjang saat komputer dinyalakan', category: 'Suara & Boot' },
-  { id: 'E04', code: 'E04', description: 'Terjadi hubungan singkat saat komputer dinyalakan', category: 'Daya' },
-  { id: 'E05', code: 'E05', description: 'Sistem operasi mati mendadak', category: 'Sistem' },
-  { id: 'E06', code: 'E06', description: 'Kipas processor tidak berputar', category: 'Pendingin' },
-  { id: 'E07', code: 'E07', description: 'Bunyi sistem saat startup', category: 'Suara & Boot' },
-  { id: 'E08', code: 'E08', description: 'OS tidak mau boot', category: 'Suara & Boot' },
-  { id: 'E09', code: 'E09', description: 'Performa komputer melambat drastis', category: 'Performa' },
-  { id: 'E10', code: 'E10', description: 'Komputer sering restart sendiri', category: 'Sistem' },
-  { id: 'E11', code: 'E11', description: 'Monitor menampilkan layar biru (bluescreen)', category: 'Tampilan' },
-  { id: 'E12', code: 'E12', description: 'Komputer gagal boot dan berbunyi beep', category: 'Suara & Boot' },
-  { id: 'E13', code: 'E13', description: 'Gagal menginstall software/program', category: 'Sistem' },
-  { id: 'E14', code: 'E14', description: 'Performa grafis lambat atau patah-patah', category: 'Tampilan' },
-  { id: 'E15', code: 'E15', description: 'VGA tidak bekerja atau tidak terdeteksi', category: 'Tampilan' },
-  { id: 'E16', code: 'E16', description: 'Resolusi layar tidak optimal', category: 'Tampilan' },
-  { id: 'E17', code: 'E17', description: 'Windows tidak merespon (hang)', category: 'Performa' },
-  { id: 'E18', code: 'E18', description: 'Harddisk tidak terbaca oleh sistem', category: 'Penyimpanan' },
-  { id: 'E19', code: 'E19', description: 'Muncul pesan error harddisk', category: 'Penyimpanan' },
-  { id: 'E20', code: 'E20', description: 'Operating System Not Found', category: 'Penyimpanan' },
-  { id: 'E21', code: 'E21', description: 'Tidak ada suara/aktivitas dari harddisk', category: 'Penyimpanan' },
-  { id: 'E22', code: 'E22', description: 'Monitor menampilkan layar putih kosong', category: 'Tampilan' },
-  { id: 'E23', code: 'E23', description: 'Monitor tidak menyala sama sekali', category: 'Tampilan' },
-  { id: 'E24', code: 'E24', description: 'Tampilan monitor blur atau kontras rendah', category: 'Tampilan' },
-  { id: 'E25', code: 'E25', description: 'Komputer tiba-tiba mati sendiri', category: 'Daya' },
-  { id: 'E26', code: 'E26', description: 'Komputer freeze / tidak merespon', category: 'Performa' },
-  { id: 'E27', code: 'E27', description: 'Proses loading sangat lambat', category: 'Penyimpanan' },
-  { id: 'E28', code: 'E28', description: 'Suhu PC menjadi sangat panas (overheat)', category: 'Pendingin' },
-];
-
-const categories = ['Semua', 'Tampilan', 'Daya', 'Suara & Boot', 'Sistem', 'Performa', 'Penyimpanan', 'Pendingin'];
 
 const categoryColors: Record<string, string> = {
   'Tampilan':    'bg-purple-100 text-purple-700 border-purple-200',
@@ -57,28 +18,46 @@ const categoryColors: Record<string, string> = {
 };
 
 export function DiagnosisPage({ onBack, onDiagnose }: DiagnosisPageProps) {
-  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
+  const [symptoms, setSymptoms] = useState<Symptom[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedMap, setSelectedMap] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('Semua');
 
-  const handleToggleSymptom = (symptomId: string) => {
-    setSelectedSymptoms(prev =>
-      prev.includes(symptomId)
-        ? prev.filter(id => id !== symptomId)
-        : [...prev, symptomId]
-    );
+  useEffect(() => {
+    async function load() {
+      const data = await getSymptoms();
+      setSymptoms(data);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const handleToggleSymptom = (code: string) => {
+    setSelectedMap(prev => {
+      const next = { ...prev };
+      if (next[code] !== undefined) {
+        delete next[code];
+      } else {
+        next[code] = 1.0; // Default to "Sangat Yakin"
+      }
+      return next;
+    });
+  };
+
+  const handleCertaintyChange = (code: string, val: number) => {
+    setSelectedMap(prev => ({ ...prev, [code]: val }));
   };
 
   const handleDiagnose = () => {
-    if (selectedSymptoms.length === 0) {
-      return;
-    }
-    onDiagnose(selectedSymptoms);
+    const selected = Object.entries(selectedMap).map(([code, certainty]) => ({ code, certainty }));
+    if (selected.length === 0) return;
+    onDiagnose(selected);
   };
 
-  const handleClearAll = () => {
-    setSelectedSymptoms([]);
-  };
+  const handleClearAll = () => setSelectedMap({});
+
+  const categories = ['Semua', ...Array.from(new Set(symptoms.map(s => s.category)))];
 
   const filteredSymptoms = symptoms.filter(s => {
     const matchCat = activeCategory === 'Semua' || s.category === activeCategory;
@@ -87,7 +66,9 @@ export function DiagnosisPage({ onBack, onDiagnose }: DiagnosisPageProps) {
     return matchCat && matchSearch;
   });
 
-  const selectedList = symptoms.filter(s => selectedSymptoms.includes(s.id));
+  const selectedCount = Object.keys(selectedMap).length;
+
+  if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Memuat gejala...</div>;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -111,12 +92,12 @@ export function DiagnosisPage({ onBack, onDiagnose }: DiagnosisPageProps) {
                 <span className="font-semibold text-gray-900 text-sm">SiPakarPC</span>
               </div>
             </div>
-            {selectedSymptoms.length > 0 && (
+            {selectedCount > 0 && (
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-600">{selectedSymptoms.length} gejala dipilih</span>
+                <span className="text-sm text-gray-600 font-medium">{selectedCount} gejala dipilih</span>
                 <button
                   onClick={handleDiagnose}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 shadow-sm"
                 >
                   <ClipboardList className="w-4 h-4" />
                   Diagnosa Sekarang
@@ -130,8 +111,8 @@ export function DiagnosisPage({ onBack, onDiagnose }: DiagnosisPageProps) {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Page Title */}
         <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Pilih Gejala Kerusakan PC</h1>
-          <p className="text-gray-500">Centang semua gejala yang dialami komputer Anda. Semakin banyak gejala dipilih, semakin akurat hasil diagnosis.</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Diagnosis Kerusakan PC</h1>
+          <p className="text-gray-500 max-w-2xl">Pilih gejala yang dialami komputer Anda dan tentukan tingkat keyakinan Anda terhadap gejala tersebut untuk hasil yang lebih akurat.</p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -143,7 +124,7 @@ export function DiagnosisPage({ onBack, onDiagnose }: DiagnosisPageProps) {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Cari gejala..."
+                  placeholder="Cari gejala (misal: bluescreen, lambat, beep)..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -167,7 +148,7 @@ export function DiagnosisPage({ onBack, onDiagnose }: DiagnosisPageProps) {
             </div>
 
             {/* Symptoms Grid */}
-            <div className="space-y-2">
+            <div className="space-y-3">
               {filteredSymptoms.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
                   <Search className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -175,50 +156,66 @@ export function DiagnosisPage({ onBack, onDiagnose }: DiagnosisPageProps) {
                 </div>
               ) : (
                 filteredSymptoms.map(symptom => {
-                  const isSelected = selectedSymptoms.includes(symptom.id);
+                  const isSelected = selectedMap[symptom.code] !== undefined;
                   return (
-                    <label
-                      key={symptom.id}
-                      className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all group ${
+                    <div
+                      key={symptom.code}
+                      className={`p-4 rounded-xl border transition-all ${
                         isSelected
                           ? 'bg-blue-50 border-blue-400 shadow-sm'
                           : 'bg-white border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 shadow-sm'
                       }`}
                     >
-                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                        isSelected
-                          ? 'bg-blue-600 border-blue-600'
-                          : 'border-gray-300 group-hover:border-blue-400'
-                      }`}>
+                      <div className="flex items-start gap-4">
+                        <label className="flex items-center gap-4 cursor-pointer flex-1 min-w-0">
+                          <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                            isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
+                          }`}>
+                            {isSelected && (
+                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleSymptom(symptom.code)}
+                            className="hidden"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                                isSelected ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-500 border-gray-200'
+                              }`}>
+                                {symptom.code}
+                              </span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded border ${categoryColors[symptom.category]}`}>
+                                {symptom.category}
+                              </span>
+                            </div>
+                            <p className={`text-sm ${isSelected ? 'text-blue-900 font-medium' : 'text-gray-700'}`}>
+                              {symptom.description}
+                            </p>
+                          </div>
+                        </label>
+
                         {isSelected && (
-                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
+                          <div className="w-40 flex-shrink-0">
+                            <p className="text-[10px] text-blue-600 font-bold uppercase mb-1.5 px-1">Keyakinan Anda:</p>
+                            <select
+                              value={selectedMap[symptom.code]}
+                              onChange={(e) => handleCertaintyChange(symptom.code, parseFloat(e.target.value))}
+                              className="w-full bg-white border border-blue-200 text-blue-700 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            >
+                              {USER_CERTAINTY_LEVELS.map(lvl => (
+                                <option key={lvl.value} value={lvl.value}>{lvl.label}</option>
+                              ))}
+                            </select>
+                          </div>
                         )}
                       </div>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => handleToggleSymptom(symptom.id)}
-                        className="hidden"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-md border ${
-                            isSelected ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-500 border-gray-200'
-                          }`}>
-                            {symptom.code}
-                          </span>
-                          <span className={`text-xs px-2 py-0.5 rounded-md border ${categoryColors[symptom.category]}`}>
-                            {symptom.category}
-                          </span>
-                        </div>
-                        <p className={`text-sm mt-1 ${isSelected ? 'text-blue-800 font-medium' : 'text-gray-700'}`}>
-                          {symptom.description}
-                        </p>
-                      </div>
-                      {isSelected && <CheckCircle2 className="w-5 h-5 text-blue-500 flex-shrink-0" />}
-                    </label>
+                    </div>
                   );
                 })
               )}
@@ -229,13 +226,13 @@ export function DiagnosisPage({ onBack, onDiagnose }: DiagnosisPageProps) {
           <div className="lg:col-span-1">
             <div className="sticky top-24">
               {/* Warning if empty */}
-              {selectedSymptoms.length === 0 ? (
+              {selectedCount === 0 ? (
                 <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-8 text-center">
                   <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <AlertCircle className="w-7 h-7 text-gray-400" />
                   </div>
                   <p className="text-gray-500 text-sm mb-1">Belum ada gejala dipilih</p>
-                  <p className="text-gray-400 text-xs">Pilih minimal 1 gejala dari daftar di sebelah kiri</p>
+                  <p className="text-gray-400 text-xs">Pilih minimal 1 gejala untuk memulai diagnosis</p>
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -243,7 +240,7 @@ export function DiagnosisPage({ onBack, onDiagnose }: DiagnosisPageProps) {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-white font-semibold text-sm">Gejala Dipilih</p>
-                        <p className="text-blue-200 text-xs">{selectedSymptoms.length} dari 28 gejala</p>
+                        <p className="text-blue-200 text-xs">{selectedCount} gejala aktif</p>
                       </div>
                       <button
                         onClick={handleClearAll}
@@ -253,25 +250,25 @@ export function DiagnosisPage({ onBack, onDiagnose }: DiagnosisPageProps) {
                         Hapus Semua
                       </button>
                     </div>
-                    {/* Progress bar */}
-                    <div className="mt-3 bg-blue-700 rounded-full h-2">
-                      <div
-                        className="bg-white rounded-full h-2 transition-all"
-                        style={{ width: `${(selectedSymptoms.length / 28) * 100}%` }}
-                      />
-                    </div>
                   </div>
-                  <div className="p-4 max-h-64 overflow-y-auto space-y-2">
-                    {selectedList.map(s => (
-                      <div key={s.id} className="flex items-start gap-2 group">
+                  <div className="p-4 max-h-[400px] overflow-y-auto space-y-3">
+                    {symptoms.filter(s => selectedMap[s.code] !== undefined).map(s => (
+                      <div key={s.code} className="flex items-start gap-3 group border-b border-gray-50 pb-3 last:border-0 last:pb-0">
                         <CheckCircle2 className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                        <p className="text-xs text-gray-700 flex-1">{s.description}</p>
-                        <button
-                          onClick={() => handleToggleSymptom(s.id)}
-                          className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] text-gray-700 leading-snug line-clamp-2">{s.description}</p>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-[10px] font-bold text-blue-600">
+                              {USER_CERTAINTY_LEVELS.find(l => l.value === selectedMap[s.code])?.label}
+                            </span>
+                            <button
+                              onClick={() => handleToggleSymptom(s.code)}
+                              className="text-gray-300 hover:text-red-500 transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -282,21 +279,16 @@ export function DiagnosisPage({ onBack, onDiagnose }: DiagnosisPageProps) {
               <div className="mt-4">
                 <button
                   onClick={handleDiagnose}
-                  disabled={selectedSymptoms.length === 0}
+                  disabled={selectedCount === 0}
                   className={`w-full py-4 rounded-xl font-semibold text-base transition-all flex items-center justify-center gap-2 ${
-                    selectedSymptoms.length === 0
+                    selectedCount === 0
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl'
                   }`}
                 >
                   <ClipboardList className="w-5 h-5" />
-                  {selectedSymptoms.length === 0 ? 'Pilih Gejala Dahulu' : 'Mulai Diagnosis'}
+                  {selectedCount === 0 ? 'Pilih Gejala Dahulu' : 'Mulai Diagnosis'}
                 </button>
-                {selectedSymptoms.length > 0 && (
-                  <p className="text-center text-xs text-gray-400 mt-2">
-                    Sistem akan menganalisis {selectedSymptoms.length} gejala yang dipilih
-                  </p>
-                )}
               </div>
 
               {/* Info card */}
@@ -305,7 +297,7 @@ export function DiagnosisPage({ onBack, onDiagnose }: DiagnosisPageProps) {
                   <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-xs font-semibold text-amber-800 mb-1">Tips Diagnosis Akurat</p>
-                    <p className="text-xs text-amber-700 leading-relaxed">Pilih semua gejala yang sesuai kondisi PC Anda. Semakin lengkap gejala dipilih, semakin akurat hasil diagnosis yang diberikan.</p>
+                    <p className="text-xs text-amber-700 leading-relaxed">Berikan tingkat keyakinan yang jujur. "Sangat Yakin" (1.0) jika gejala tersebut pasti terjadi, atau tingkatan lain jika Anda ragu.</p>
                   </div>
                 </div>
               </div>

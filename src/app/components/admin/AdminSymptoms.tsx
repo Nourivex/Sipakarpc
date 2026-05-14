@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Plus, Pencil, Trash2, Search, X, Check, AlertTriangle } from 'lucide-react';
-import { Symptom, getSymptoms, saveSymptoms } from '../../data/adminStore';
+import { useState, useEffect } from 'react';
+import { Plus, Pencil, Trash2, Search, Check, AlertTriangle } from 'lucide-react';
+import { Symptom, getSymptoms, saveSymptom, deleteSymptom } from '../../data/adminStore';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '../ui/dialog';
@@ -20,7 +20,8 @@ const categoryColors: Record<string, string> = {
 const empty: Omit<Symptom, 'id'> = { code: '', description: '', category: 'Tampilan' };
 
 export function AdminSymptoms() {
-  const [symptoms, setSymptoms] = useState<Symptom[]>(getSymptoms());
+  const [symptoms, setSymptoms] = useState<Symptom[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('Semua');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -29,6 +30,20 @@ export function AdminSymptoms() {
   const [form, setForm] = useState<Omit<Symptom, 'id'>>(empty);
   const [formError, setFormError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  const loadSymptoms = async () => {
+    setLoading(true);
+    try {
+      const data = await getSymptoms();
+      setSymptoms(data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSymptoms();
+  }, []);
 
   const filtered = symptoms.filter(s => {
     const matchCat = filterCat === 'Semua' || s.category === filterCat;
@@ -55,37 +70,33 @@ export function AdminSymptoms() {
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.code.trim() || !form.description.trim()) {
       setFormError('Kode dan deskripsi wajib diisi.');
       return;
     }
-    const codeExists = symptoms.some(s => s.code === form.code.trim() && s.id !== editing?.id);
-    if (codeExists) {
-      setFormError('Kode gejala sudah ada.');
-      return;
+    try {
+      await saveSymptom({ id: editing?.id || '', ...form, code: form.code.trim().toUpperCase() });
+      showSuccess(editing ? 'Gejala berhasil diperbarui!' : 'Gejala berhasil ditambahkan!');
+      setDialogOpen(false);
+      loadSymptoms();
+    } catch (err: any) {
+      setFormError(err.message || 'Gagal menyimpan gejala.');
     }
-    let updated: Symptom[];
-    if (editing) {
-      updated = symptoms.map(s => s.id === editing.id ? { ...s, ...form, code: form.code.trim() } : s);
-      showSuccess('Gejala berhasil diperbarui!');
-    } else {
-      const newS: Symptom = { id: form.code.trim(), ...form, code: form.code.trim().toUpperCase() };
-      updated = [...symptoms, newS].sort((a, b) => a.code.localeCompare(b.code));
-      showSuccess('Gejala berhasil ditambahkan!');
-    }
-    setSymptoms(updated);
-    saveSymptoms(updated);
-    setDialogOpen(false);
   };
 
-  const handleDelete = (s: Symptom) => {
-    const updated = symptoms.filter(x => x.id !== s.id);
-    setSymptoms(updated);
-    saveSymptoms(updated);
-    setDeleteDialog(null);
-    showSuccess('Gejala berhasil dihapus!');
+  const handleDelete = async (s: Symptom) => {
+    try {
+      await deleteSymptom(s.id);
+      setDeleteDialog(null);
+      showSuccess('Gejala berhasil dihapus!');
+      loadSymptoms();
+    } catch (err: any) {
+      alert('Gagal menghapus: ' + err.message);
+    }
   };
+
+  if (loading && symptoms.length === 0) return <div className="p-8 text-center text-gray-500">Memuat gejala...</div>;
 
   return (
     <div className="space-y-5">

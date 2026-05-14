@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, Monitor, Zap, MemoryStick, HardDrive, CircuitBoard, Cpu, Thermometer, Check, AlertTriangle } from 'lucide-react';
-import { Component, getComponents, saveComponents } from '../../data/adminStore';
+import { Component, getComponents, saveComponent, deleteComponent } from '../../data/adminStore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
 
 const iconOptions = ['Monitor', 'Zap', 'MemoryStick', 'HardDrive', 'CircuitBoard', 'Cpu', 'Thermometer'];
@@ -11,7 +11,7 @@ const iconMap: Record<string, React.ElementType> = {
 
 const colorMap: Record<string, { bg: string; icon: string }> = {
   'VGA Card':     { bg: 'bg-purple-50', icon: 'text-purple-600 bg-purple-100' },
-  'Power Supply': { bg: 'bg-yellow-50', icon: 'text-yellow-600 bg-yellow-100' },
+  'Power Supplay': { bg: 'bg-yellow-50', icon: 'text-yellow-600 bg-yellow-100' },
   'RAM':          { bg: 'bg-green-50',  icon: 'text-green-600 bg-green-100' },
   'Harddisk':     { bg: 'bg-blue-50',   icon: 'text-blue-600 bg-blue-100' },
   'Motherboard':  { bg: 'bg-red-50',    icon: 'text-red-600 bg-red-100' },
@@ -23,13 +23,28 @@ const colorMap: Record<string, { bg: string; icon: string }> = {
 const defaultForm = { name: '', description: '', icon: 'Cpu' };
 
 export function AdminComponents() {
-  const [components, setComponents] = useState<Component[]>(getComponents());
+  const [components, setComponents] = useState<Component[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<Component | null>(null);
   const [editing, setEditing] = useState<Component | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [formError, setFormError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  const loadComponents = async () => {
+    setLoading(true);
+    try {
+      const data = await getComponents();
+      setComponents(data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadComponents();
+  }, []);
 
   const showSuccess = (msg: string) => {
     setSuccessMsg(msg);
@@ -50,37 +65,33 @@ export function AdminComponents() {
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim() || !form.description.trim()) {
       setFormError('Nama dan deskripsi wajib diisi.');
       return;
     }
-    const nameExists = components.some(c => c.name.toLowerCase() === form.name.trim().toLowerCase() && c.id !== editing?.id);
-    if (nameExists) {
-      setFormError('Nama komponen sudah ada.');
-      return;
+    try {
+      await saveComponent({ id: editing?.id || '', ...form, name: form.name.trim() });
+      showSuccess(editing ? 'Komponen berhasil diperbarui!' : 'Komponen berhasil ditambahkan!');
+      setDialogOpen(false);
+      loadComponents();
+    } catch (err: any) {
+      setFormError(err.message || 'Gagal menyimpan komponen.');
     }
-    let updated: Component[];
-    if (editing) {
-      updated = components.map(c => c.id === editing.id ? { ...c, ...form, name: form.name.trim() } : c);
-      showSuccess('Komponen berhasil diperbarui!');
-    } else {
-      const newC: Component = { id: String(Date.now()), ...form, name: form.name.trim() };
-      updated = [...components, newC];
-      showSuccess('Komponen berhasil ditambahkan!');
-    }
-    setComponents(updated);
-    saveComponents(updated);
-    setDialogOpen(false);
   };
 
-  const handleDelete = (c: Component) => {
-    const updated = components.filter(x => x.id !== c.id);
-    setComponents(updated);
-    saveComponents(updated);
-    setDeleteDialog(null);
-    showSuccess('Komponen berhasil dihapus!');
+  const handleDelete = async (c: Component) => {
+    try {
+      await deleteComponent(c.id);
+      setDeleteDialog(null);
+      showSuccess('Komponen berhasil dihapus!');
+      loadComponents();
+    } catch (err: any) {
+      alert('Gagal menghapus: ' + err.message);
+    }
   };
+
+  if (loading && components.length === 0) return <div className="p-8 text-center text-gray-500">Memuat komponen...</div>;
 
   return (
     <div className="space-y-5">

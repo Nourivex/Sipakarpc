@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertCircle, ChevronLeft, RotateCcw, Cpu, AlertTriangle, Info, HardDrive, MemoryStick, Monitor, Zap, CircuitBoard, Thermometer, Share2, PrinterIcon } from 'lucide-react';
+import { CheckCircle2, AlertCircle, ChevronLeft, RotateCcw, Cpu, AlertTriangle, Info, HardDrive, MemoryStick, Monitor, Zap, CircuitBoard, Thermometer } from 'lucide-react';
 
 interface DiagnosisResult {
   component: string;
@@ -15,7 +15,7 @@ interface ResultsPageProps {
 
 const componentIcons: Record<string, React.ElementType> = {
   'VGA Card': Monitor,
-  'Power Supply': Zap,
+  'Power Supplay': Zap,
   'RAM': MemoryStick,
   'Harddisk': HardDrive,
   'Motherboard': CircuitBoard,
@@ -26,7 +26,7 @@ const componentIcons: Record<string, React.ElementType> = {
 
 const componentColors: Record<string, { bg: string; icon: string; bar: string; border: string }> = {
   'VGA Card':     { bg: 'bg-purple-50', icon: 'text-purple-600 bg-purple-100', bar: 'bg-purple-500', border: 'border-purple-200' },
-  'Power Supply': { bg: 'bg-yellow-50', icon: 'text-yellow-600 bg-yellow-100', bar: 'bg-yellow-500', border: 'border-yellow-200' },
+  'Power Supplay': { bg: 'bg-yellow-50', icon: 'text-yellow-600 bg-yellow-100', bar: 'bg-yellow-500', border: 'border-yellow-200' },
   'RAM':          { bg: 'bg-green-50',  icon: 'text-green-600 bg-green-100',   bar: 'bg-green-500',  border: 'border-green-200' },
   'Harddisk':     { bg: 'bg-blue-50',   icon: 'text-blue-600 bg-blue-100',     bar: 'bg-blue-500',   border: 'border-blue-200' },
   'Motherboard':  { bg: 'bg-red-50',    icon: 'text-red-600 bg-red-100',       bar: 'bg-red-500',    border: 'border-red-200' },
@@ -43,7 +43,7 @@ const recommendations: Record<string, string[]> = {
     'Coba gunakan VGA onboard sementara untuk memastikan kerusakan',
     'Jika VGA overheating, bersihkan kipas dan thermal paste',
   ],
-  'Power Supply': [
+  'Power Supplay': [
     'Periksa sambungan kabel listrik dari PSU ke komponen',
     'Ukur tegangan PSU menggunakan multimeter (12V, 5V, 3.3V)',
     'Ganti PSU jika tegangan tidak stabil atau di bawah standar',
